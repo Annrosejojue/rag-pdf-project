@@ -22,17 +22,6 @@ class RAGPipeline:
 
     def answer(self, query: str, k: int = TOP_K) -> Dict:
         retrieved = self.retriever.retrieve(query, k=k)
-        context = "\n\n".join([f"[{r['doc_id']}#{r['chunk_id']}]\n{r['text']}" for r in retrieved])
-
-        prompt = (
-            "You are a helpful assistant. Use ONLY the context below to answer the question.\n\n"
-            f"Context:\n{context}\n\n"
-            f"Question: {query}\n"
-            "Answer:"
-        )
-
-        answer_text = self.generator.generate(prompt)
-        return {
-            "answer": answer_text,
-            "retrieved_chunks": retrieved
-        }
+        result = self.generator.generate(query, retrieved)
+        return result
+        
