@@ -3,7 +3,7 @@ We used MiniLM (all‑MiniLM‑L6‑v2) as the embedding model to convert text i
 We used FLAN‑T5‑Base as the generator model to produce answers.
 The embedding model worked perfectly — retrieval was accurate.
 The generator model was too small, so answers were short, random, or incomplete.
-Day 2 — Quality Upgrades
+Day 2 Quality Upgrades
 Added Cross‑Encoder reranker (ms-marco-MiniLM-L-6-v2)
 Added multi‑chunk context merging
 Added strong prompt template
