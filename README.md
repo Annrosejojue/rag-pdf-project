@@ -7,5 +7,4 @@ Day 2 Quality Upgrades
 Added Cross‑Encoder reranker (ms-marco-MiniLM-L-6-v2)
 Added multi‑chunk context merging
 Added strong prompt template
-Added no‑answer detection
-Upgraded generator to support (query, retrieved_chunks)
+Added no‑answer detection Upgraded generator to support (query, retrieved_chunks)
