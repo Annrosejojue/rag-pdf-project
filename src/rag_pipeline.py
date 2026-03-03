@@ -6,10 +6,11 @@ from .retriever import Retriever
 from .generator import Generator
 
 class RAGPipeline:
-    def __init__(self, embedding_model_name: str = EMBEDDING_MODEL_NAME,
+    def __init__(self,
+                 embedding_model_name: str = EMBEDDING_MODEL_NAME,
                  generator_model_name: str = GENERATOR_MODEL_NAME,
                  embedding_dim: int = 384):
-        # 384 is the dimension for all-MiniLM-L6-v2
+
         self.embedder = EmbeddingModel(embedding_model_name)
         self.vector_store = FaissVectorStore(embedding_dim)
         self.retriever = Retriever(self.embedder, self.vector_store)
@@ -22,6 +23,4 @@ class RAGPipeline:
 
     def answer(self, query: str, k: int = TOP_K) -> Dict:
         retrieved = self.retriever.retrieve(query, k=k)
-        result = self.generator.generate(query, retrieved)
-        return result
-        
+        return self.generator.generate(query, retrieved)

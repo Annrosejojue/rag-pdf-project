@@ -1,14 +1,15 @@
 from typing import List, Dict
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from .config import MAX_NEW_TOKENS, ENABLE_SELF_CHECK, ENABLE_CITATIONS
 
+# Chat-style prompt for Llama 3
 PROMPT_TEMPLATE = """You are an expert assistant.
 You are given context extracted from academic PDFs.
 Use ONLY this context to answer the question.
 
 Rules:
 - Answer in clear, complete sentences.
-- Do NOT copy random phrases.
 - Do NOT hallucinate.
 - If the context does not contain the answer, say:
   "The context does not contain the answer."
@@ -22,46 +23,84 @@ Question:
 Answer:
 """
 
+SELF_CHECK_TEMPLATE = """You are verifying an answer.
+
+Context:
+{context}
+
+Answer:
+{answer}
+
+Question:
+Does the answer strictly follow the context? Reply only YES or NO.
+"""
+
 class Generator:
     def __init__(self, model_name: str):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            torch_dtype=torch.float16,
+            device_map="auto"
+        )
 
-    # Day‑2: new signature (query + retrieved chunks)
-    def generate(self, query: str, retrieved_chunks: List[Dict], max_new_tokens: int = 256) -> Dict:
+    def _merge_chunks(self, chunks: List[Dict]) -> str:
+        return "\n\n---\n\n".join([c["text"] for c in chunks])
 
-        # If nothing retrieved → no answer
+    def _self_check(self, context: str, answer: str) -> bool:
+        prompt = SELF_CHECK_TEMPLATE.format(context=context, answer=answer)
+        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+
+        with torch.no_grad():
+            out = self.model.generate(
+                **inputs,
+                max_new_tokens=5,
+                do_sample=False
+            )
+
+        verdict = self.tokenizer.decode(out[0], skip_special_tokens=True).strip()
+        return verdict.upper().startswith("YES")
+
+    def generate(self, query: str, retrieved_chunks: List[Dict]) -> Dict:
+
         if not retrieved_chunks:
             return {
                 "answer": "The context does not contain the answer.",
                 "retrieved_chunks": []
             }
 
-        # Merge multiple chunks into one context block
-        context = "\n\n---\n\n".join([c["text"] for c in retrieved_chunks])
+        context = self._merge_chunks(retrieved_chunks)
 
-        # Build final prompt
         prompt = PROMPT_TEMPLATE.format(context=context, question=query)
 
-        # Tokenize
         inputs = self.tokenizer(
             prompt,
             return_tensors="pt",
             truncation=True,
-            max_length=1024
-        )
+            max_length=4096
+        ).to(self.model.device)
 
-        # Generate
         with torch.no_grad():
             outputs = self.model.generate(
                 **inputs,
-                max_new_tokens=max_new_tokens,
+                max_new_tokens=MAX_NEW_TOKENS,
+                temperature=0.0,
                 do_sample=False
             )
 
         answer = self.tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
-        if not answer:
-            answer = "The context does not contain the answer."
+
+        # Self-check to prevent hallucinations
+        if ENABLE_SELF_CHECK:
+            ok = self._self_check(context, answer)
+            if not ok:
+                answer = "The context does not contain the answer."
+
+        # Add citations
+        if ENABLE_CITATIONS:
+            answer += "\n\nSources:\n"
+            for c in retrieved_chunks:
+                answer += f"- [{c['doc_id']}#{c['chunk_id']}]\n"
 
         return {
             "answer": answer,
