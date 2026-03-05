@@ -3,7 +3,6 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from .config import MAX_NEW_TOKENS, ENABLE_SELF_CHECK, ENABLE_CITATIONS
 
-# Chat-style prompt for Llama 3
 PROMPT_TEMPLATE = """You are an expert assistant.
 You are given context extracted from academic PDFs.
 Use ONLY this context to answer the question.
@@ -40,7 +39,7 @@ class Generator:
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name,
-            torch_dtype=torch.float16,
+            torch_dtype=torch.float32,
             device_map="auto"
         )
 
@@ -48,8 +47,8 @@ class Generator:
         return "\n\n---\n\n".join([c["text"] for c in chunks])
 
     def _self_check(self, context: str, answer: str) -> bool:
-        prompt = SELF_CHECK_TEMPLATE.format(context=context, answer=answer)
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+        prompt = f"<s>[INST] {SELF_CHECK_TEMPLATE.format(context=context, answer=answer)} [/INST]"
+        inputs = self.tokenizer(prompt, return_tensors="pt", add_special_tokens=False).to(self.model.device)
 
         with torch.no_grad():
             out = self.model.generate(
@@ -71,32 +70,31 @@ class Generator:
 
         context = self._merge_chunks(retrieved_chunks)
 
-        prompt = PROMPT_TEMPLATE.format(context=context, question=query)
+        # Correct chat-style wrapping
+        prompt = f"<s>[INST] {PROMPT_TEMPLATE.format(context=context, question=query)} [/INST]"
 
         inputs = self.tokenizer(
             prompt,
             return_tensors="pt",
             truncation=True,
-            max_length=4096
+            max_length=4096,
+            add_special_tokens=False
         ).to(self.model.device)
 
         with torch.no_grad():
             outputs = self.model.generate(
                 **inputs,
                 max_new_tokens=MAX_NEW_TOKENS,
-                temperature=0.0,
                 do_sample=False
             )
 
         answer = self.tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
 
-        # Self-check to prevent hallucinations
         if ENABLE_SELF_CHECK:
             ok = self._self_check(context, answer)
             if not ok:
                 answer = "The context does not contain the answer."
 
-        # Add citations
         if ENABLE_CITATIONS:
             answer += "\n\nSources:\n"
             for c in retrieved_chunks:

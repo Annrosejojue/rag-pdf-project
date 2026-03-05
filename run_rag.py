@@ -1,6 +1,11 @@
 from src.ingest import load_pdfs
 from src.chunk import chunk_documents
 from src.rag_pipeline import RAGPipeline
+import os
+from src.config import GENERATOR_MODEL_NAME
+print("USING MODEL:", GENERATOR_MODEL_NAME)
+print("CONFIG PATH:", os.path.abspath(__file__))
+
 
 def build_index():
     docs = load_pdfs()
