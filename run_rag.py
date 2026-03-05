@@ -8,7 +8,7 @@ def build_index():
 
     rag = RAGPipeline(
         embedding_model_name="sentence-transformers/all-MiniLM-L6-v2",
-        generator_model_name="meta-llama/Meta-Llama-3-8B-Instruct",
+        generator_model_name="mistralai/Mistral-7B-Instruct-v0.2",
         embedding_dim=384
     )
 

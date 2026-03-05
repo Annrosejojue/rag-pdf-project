@@ -1,6 +1,6 @@
 # Embedding model
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-GENERATOR_MODEL_NAME = "meta-llama/Meta-Llama-3-8B-Instruct"
+GENERATOR_MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.2"
 RERANKER_MODEL_NAME = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 # Retrieval settings
 TOP_K = 3
